@@ -1,12 +1,12 @@
 {
   "domain": "bn_prayer_times",
   "name": "BN Prayer Times",
-  "version": "1.0.0",
-  "documentation": "https://github.com/zam-hs/bn-prayer-times",
-  "issue_tracker": "https://github.com/zam-hs/bn-prayer-times/issues",
   "codeowners": ["@zam-hs"],
   "config_flow": true,
-  "iot_class": "local_polling",
+  "documentation": "https://github.com/zam-hs/bn-prayer-times",
   "integration_type": "hub",
-  "requirements": []
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/zam-hs/bn-prayer-times/issues",
+  "requirements": [],
+  "version": "1.0.0"
 }
