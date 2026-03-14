@@ -1,0 +1,29 @@
+{
+  "config": {
+    "abort": {
+      "single_instance_allowed": "BN Prayer Times is already configured. Only one instance is allowed."
+    },
+    "step": {
+      "user": {
+        "title": "BN Prayer Times",
+        "description": "Select district and Hijri adjustment.",
+        "data": {
+          "district": "District",
+          "hijri_offset": "Hijri offset | Now: {today}"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "BN Prayer Times Settings",
+        "description": "Update district or Hijri adjustment.",
+        "data": {
+          "district": "District",
+          "hijri_offset": "Hijri offset | Now: {today}"
+        }
+      }
+    }
+  }
+}
