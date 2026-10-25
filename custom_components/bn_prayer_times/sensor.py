@@ -42,9 +42,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 # HIJRI SUPPORT
 # -----------------------------------------------------
 HIJRI_MONTHS = [
-    "Muharram","Safar","Rabi' al-Awwal","Rabi' al-Thani",
-    "Jumada al-Ula","Jumada al-Thani","Rajab","Sha'ban",
-    "Ramadan","Shawwal","Dhu al-Qi'dah","Dhu al-Hijjah",
+    "Muharram","Safar","Rabiulawal","Rabiulakhir",
+    "Jamadilawal","Jamadilakhir","Rejab","Sya'ban",
+    "Ramadhan","Syawal","Zulkaedah","Zulhijjah",
 ]
 
 
