@@ -68,6 +68,6 @@ Note: For more advanced automation, you can play the azan through a smart speake
 ## Credits
 
 Local prayer schedule taken from:
-```url
-https://www.information.gov.bn/Shared%20Documents/Kalendar%20Jabatan%20Penerangan%202026.pdf
+```
+Ministry of Religious Affairs, Brunei Darussalam
 ```
