@@ -23,6 +23,7 @@ class PrayerCoordinator(DataUpdateCoordinator):
         self.hass = hass
         self.entry = entry
         self._unsub_midnight = None
+        self._stopped = False
 
         super().__init__(
             hass,
@@ -39,8 +40,23 @@ class PrayerCoordinator(DataUpdateCoordinator):
     # -------------------------------------------------
     # Midnight refresh
     # -------------------------------------------------
+    def _cancel_midnight_refresh(self):
+        """Cancel the pending midnight timer, if any."""
+        if self._unsub_midnight:
+            self._unsub_midnight()
+            self._unsub_midnight = None
+
+    async def async_shutdown(self):
+        """Cancel timers when the config entry is unloaded."""
+        self._stopped = True
+        self._cancel_midnight_refresh()
+        await super().async_shutdown()
+
     def _schedule_midnight_refresh(self):
         """Schedule refresh exactly at midnight."""
+
+        if self._stopped:
+            return
 
         now = dt_util.now()
 
@@ -55,8 +71,7 @@ class PrayerCoordinator(DataUpdateCoordinator):
             )
         )
 
-        if self._unsub_midnight:
-            self._unsub_midnight()
+        self._cancel_midnight_refresh()
 
         self._unsub_midnight = async_track_point_in_time(
             self.hass,
@@ -85,10 +100,10 @@ class PrayerCoordinator(DataUpdateCoordinator):
             _LOGGER.error("prayers.csv not found")
             return {}
 
-        today = datetime.now().strftime("%Y-%m-%d")
-        tomorrow = (
-            datetime.now() + timedelta(days=1)
-        ).strftime("%Y-%m-%d")
+        # Use the Home Assistant timezone, not the system clock's.
+        now = dt_util.now()
+        today = now.strftime("%Y-%m-%d")
+        tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 
         today_row = {}
         tomorrow_row = {}
@@ -106,6 +121,13 @@ class PrayerCoordinator(DataUpdateCoordinator):
 
         except Exception as err:
             _LOGGER.error("CSV read error: %s", err)
+
+        if not today_row:
+            _LOGGER.warning(
+                "No prayer times for %s in prayers.csv; "
+                "update the integration to get the newest schedule",
+                today,
+            )
 
         return {
             "today": today_row,

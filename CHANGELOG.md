@@ -6,3 +6,11 @@
 
 ## 1.0.2
 - Add logo and dark variants; use visible green icon for light theme
+
+## 1.0.3
+- Use the Home Assistant timezone (`dt_util.now()`) when looking up today and tomorrow
+- Fix Hijri offset of 0 in options not overriding the value from the config entry
+- Cancel the Next Prayer, Hijri and midnight timers on unload/reload (no duplicate timers)
+- Remove the redundant "Prayer Midnight Refresh" sensor
+- Log a warning when the schedule has no row for today
+- Document which years the bundled schedule covers

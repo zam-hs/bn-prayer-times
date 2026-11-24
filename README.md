@@ -32,6 +32,16 @@ Home Assistant custom integration providing Brunei Darussalam prayer times from 
 - Kuala Belait (+3 mins)
 - Temburong
 
+## Prayer schedule coverage
+
+The schedule is bundled in `prayers.csv` and currently covers:
+
+| Year | Dates |
+|------|-------|
+| 2026 | 1 Jan 2026 – 31 Dec 2026 |
+
+After the last covered date, the prayer, Next Prayer and Hijri sensors have no data until the integration is updated to a release that includes the next year's schedule. A warning is logged when today's date is missing.
+
 ## Automations Example
 
 Notify before Maghrib

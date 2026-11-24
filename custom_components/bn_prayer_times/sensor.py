@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.event import (
@@ -33,7 +34,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entities.append(TomorrowPrayerSensor(coordinator))
     entities.append(NextPrayerSensor(coordinator))
     entities.append(HijriDateSensor(coordinator))
-    entities.append(MidnightRefreshSensor(coordinator))  # ⭐ new
+
+    # The old "Prayer Midnight Refresh" sensor was removed (the coordinator
+    # already refreshes at midnight); clean up its leftover registry entry.
+    registry = er.async_get(hass)
+    old_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, "bn_prayer_midnight_refresh"
+    )
+    if old_id:
+        registry.async_remove(old_id)
 
     async_add_entities(entities)
 
@@ -213,10 +222,12 @@ class NextPrayerSensor(BasePrayerEntity, SensorEntity):
         await super().async_added_to_hass()
         self._recalculate()
 
-        async_track_time_interval(
-            self.hass,
-            self._tick,
-            timedelta(seconds=1),
+        self.async_on_remove(
+            async_track_time_interval(
+                self.hass,
+                self._tick,
+                timedelta(seconds=1),
+            )
         )
 
     def _recalculate(self):
@@ -285,7 +296,13 @@ class HijriDateSensor(BasePrayerEntity, SensorEntity):
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
+        self.async_on_remove(self._cancel_schedule)
         self._schedule()
+
+    def _cancel_schedule(self):
+        if self._unsub:
+            self._unsub()
+            self._unsub = None
 
     def _schedule(self):
         today = self.coordinator.data.get("today", {})
@@ -300,8 +317,7 @@ class HijriDateSensor(BasePrayerEntity, SensorEntity):
         if dt_util.now() >= maghrib_dt:
             maghrib_dt += timedelta(days=1)
 
-        if self._unsub:
-            self._unsub()
+        self._cancel_schedule()
 
         self._unsub = async_track_point_in_time(
             self.hass,
@@ -333,54 +349,12 @@ class HijriDateSensor(BasePrayerEntity, SensorEntity):
             datetime.combine(g_date, datetime.min.time())
         )
 
-        offset = int(
-            self.coordinator.entry.options.get(CONF_HIJRI_OFFSET)
-            or self.coordinator.entry.data.get(CONF_HIJRI_OFFSET, 0)
-        )
+        # An offset of 0 is valid, so check for None, not falsiness.
+        offset = self.coordinator.entry.options.get(CONF_HIJRI_OFFSET)
+        if offset is None:
+            offset = self.coordinator.entry.data.get(CONF_HIJRI_OFFSET, 0)
+        offset = int(offset)
 
         h_day += offset
 
         return f"{h_day} {HIJRI_MONTHS[h_month-1]} {h_year} AH"
-
-
-# -----------------------------------------------------
-# MIDNIGHT REFRESH TRIGGER
-# -----------------------------------------------------
-class MidnightRefreshSensor(BasePrayerEntity, SensorEntity):
-
-    _attr_name = "Prayer Midnight Refresh"
-    _attr_unique_id = "bn_prayer_midnight_refresh"
-    _attr_entity_registry_enabled_default = False
-
-    async def async_added_to_hass(self):
-        await super().async_added_to_hass()
-        self._schedule()
-
-    def _schedule(self):
-
-        now = dt_util.now()
-
-        midnight = datetime.combine(
-            now.date() + timedelta(days=1),
-            datetime.min.time(),
-        )
-
-        midnight = dt_util.as_local(
-            dt_util.as_utc(
-                midnight.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
-            )
-        )
-
-        async_track_point_in_time(
-            self.hass,
-            self._trigger,
-            midnight,
-        )
-
-    async def _trigger(self, *_):
-        await self.coordinator.async_request_refresh()
-        self._schedule()
-
-    @property
-    def native_value(self):
-        return "scheduled"
