@@ -1,7 +1,7 @@
 from homeassistant import config_entries
 from homeassistant.helpers import selector
 import voluptuous as vol
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.util import dt as dt_util
 
@@ -81,13 +81,11 @@ class BNPrayerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def _preview(self, offset):
         offset = int(offset)
 
-        today = dt_util.now().date()
+        today = dt_util.now().date() + timedelta(days=offset)
         h_day, h_month, h_year = gregorian_to_hijri(
             datetime.combine(today, datetime.min.time())
         )
-
-        h_day = int(h_day + offset)
-
+        
         return f"{h_day} {HIJRI_MONTHS[h_month-1]} {h_year} AH"
 
 
@@ -151,11 +149,9 @@ class BNPrayerOptionsFlow(config_entries.OptionsFlow):
     def _preview(self, offset):
         offset = int(offset)
 
-        today = dt_util.now().date()
+        today = dt_util.now().date() + timedelta(days=offset)
         h_day, h_month, h_year = gregorian_to_hijri(
             datetime.combine(today, datetime.min.time())
         )
-
-        h_day = int(h_day + offset)
 
         return f"{h_day} {HIJRI_MONTHS[h_month-1]} {h_year} AH"
