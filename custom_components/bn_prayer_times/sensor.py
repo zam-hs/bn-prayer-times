@@ -345,16 +345,17 @@ class HijriDateSensor(BasePrayerEntity, SensorEntity):
             if now >= maghrib_dt:
                 g_date += timedelta(days=1)
 
-        h_day, h_month, h_year = gregorian_to_hijri(
-            datetime.combine(g_date, datetime.min.time())
-        )
+                # An offset of 0 is valid, so check for None, not falsiness.
+                offset = self.coordinator.entry.options.get(CONF_HIJRI_OFFSET)
+                if offset is None:
+                    offset = self.coordinator.entry.data.get(CONF_HIJRI_OFFSET, 0)
+                offset = int(offset)
 
-        # An offset of 0 is valid, so check for None, not falsiness.
-        offset = self.coordinator.entry.options.get(CONF_HIJRI_OFFSET)
-        if offset is None:
-            offset = self.coordinator.entry.data.get(CONF_HIJRI_OFFSET, 0)
-        offset = int(offset)
+                # Shift the Gregorian date first so the month rolls over by itself.
+                h_day, h_month, h_year = gregorian_to_hijri(
+                    datetime.combine(
+                        g_date + timedelta(days=offset), datetime.min.time()
+                    )
+                )
 
-        h_day += offset
-
-        return f"{h_day} {HIJRI_MONTHS[h_month-1]} {h_year} AH"
+                return f"{h_day} {HIJRI_MONTHS[h_month-1]} {h_year} AH"
