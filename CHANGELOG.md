@@ -14,3 +14,6 @@
 - Remove the redundant "Prayer Midnight Refresh" sensor
 - Log a warning when the schedule has no row for today
 - Document which years the bundled schedule covers
+
+## 1.0.4
+- Reload the entry when options change so new settings apply immediately.
