@@ -12,18 +12,22 @@ Home Assistant custom integration providing Brunei Darussalam prayer times from 
 - Tomorrow prayer schedule
 - Config UI (choose district and Hijri adjustment)
 
-## Installation (HACS)
+## Installation (Marketplace)
 
-1. Open HACS
-2. Integrations → ⋮ → Custom repositories
-3. Add:
-   ```url
-   https://github.com/zam-hs/bn-prayer-times
-   ```
-5. Category: Integration
-6. Install
-7. Restart Home Assistant
-8. Add Integration → BN Prayer Times
+1. Open Marketplace
+2. Search for **BN Prayer Times** and open it
+3. Click **Install**
+4. Restart Home Assistant
+5. Settings → Devices & Services → Add Integration → **BN Prayer Times**
+
+### Manual (custom repository)
+
+If it does not appear in the Marketplace search:
+
+1. Open Marketplace
+2. ⋮ → Custom repositories
+3. Add `https://github.com/zam-hs/bn-prayer-times` with category **Integration**
+4. Install, restart Home Assistant, then add the integration as above
 
 ## Supported Districts
 
