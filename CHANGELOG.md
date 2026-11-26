@@ -17,3 +17,7 @@
 
 ## 1.0.4
 - Reload the entry when options change so new settings apply immediately.
+
+## 1.0.5
+- Fix Hijri offset: shift the Gregorian date before converting so the month rolls over correctly (no "0 Muharram" or "31 Safar")
+- Fix the same in the config and options preview
