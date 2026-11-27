@@ -21,3 +21,18 @@
 ## 1.0.5
 - Fix Hijri offset: shift the Gregorian date before converting so the month rolls over correctly (no "0 Muharram" or "31 Safar")
 - Fix the same in the config and options preview
+
+##1.0.6
+- Faster and lighter: prayers.csv is read once, today/tomorrow times are calculated once per refresh (no per-sensor parsing)
+- Entities only update when the data actually changes
+- Midnight refresh is immediate and uses a single recurring local-midnight timer
+- Next Prayer and Hijri timers are now plain callbacks (no per-second task creation)
+- The Next Prayer countdown attribute is no longer written to the database
+- Hijri Date now updates exactly at the real Maghrib time (it could be a minute early before)
+- Next Prayer shows nothing, instead of a stale prayer, when no schedule is left
+- Invalid times in prayers.csv are skipped with a warning instead of raising errors
+- Remove the redundant second refresh at startup
+- Move Hijri helpers to their own module and share one schema/preview in the config flow
+- Use entry.runtime_data and pass config_entry to the coordinator
+- Minimum Home Assistant version is now 2024.11.0 (needed by the options flow and coordinator changes)
+- Remove unused content_in_root from hacs.json and a stray images/.screenshot file
