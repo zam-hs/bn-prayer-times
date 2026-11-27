@@ -1,29 +1,33 @@
+"""Sensors for BN Prayer Times."""
+
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 
-from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.event import (
-    async_track_time_interval,
     async_track_point_in_time,
+    async_track_time_interval,
 )
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import (
-    DOMAIN,
-    PRAYERS,
-    DISTRICT_TIME_OFFSET,
-    CONF_DISTRICT,
-    CONF_HIJRI_OFFSET,
-)
+from .const import DOMAIN, PRAYERS
+from .coordinator import PrayerCoordinator
+from .hijri import format_hijri
+
+# Entities never poll; they are updated by the coordinator.
+PARALLEL_UPDATES = 0
 
 
 # -----------------------------------------------------
 # SETUP ENTRY
 # -----------------------------------------------------
 async def async_setup_entry(hass, entry, async_add_entities):
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     entities = []
 
@@ -47,88 +51,20 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(entities)
 
 
-# -----------------------------------------------------
-# HIJRI SUPPORT
-# -----------------------------------------------------
-HIJRI_MONTHS = [
-    "Muharram","Safar","Rabiulawal","Rabiulakhir",
-    "Jamadilawal","Jamadilakhir","Rejab","Sya'ban",
-    "Ramadhan","Syawal","Zulkaedah","Zulhijjah",
-]
-
-
-def gregorian_to_hijri(g_date):
-    jd = g_date.toordinal() + 1721424
-    l = jd - 1948440 + 10632
-    n = (l - 1) // 10631
-    l = l - 10631 * n + 354
-    j = (
-        ((10985 - l) // 5316) * ((50 * l) // 17719)
-        + (l // 5670) * ((43 * l) // 15238)
-    )
-    l = (
-        l
-        - ((30 - j) // 15) * ((17719 * j) // 50)
-        - (j // 16) * ((15238 * j) // 43)
-        + 29
-    )
-    month = (24 * l) // 709
-    day = l - (709 * month) // 24
-    year = 30 * n + j - 30
-    return int(day), int(month), int(year)
-
-
-# -----------------------------------------------------
-# UTILITIES
-# -----------------------------------------------------
-def get_district(entry):
-    return (
-        entry.options.get(CONF_DISTRICT)
-        or entry.data.get(CONF_DISTRICT)
-        or "Brunei/Muara"
-    )
-
-
-def apply_district_offset(coordinator, timestr):
-    if not timestr:
-        return None
-
-    district = get_district(coordinator.entry)
-    offset = DISTRICT_TIME_OFFSET.get(district, 0)
-
-    dt = datetime.strptime(timestr, "%H:%M")
-    dt += timedelta(minutes=offset)
-    return dt
-
-
-def format_12h(dt):
-    return dt.strftime("%I:%M %p")
-
-
-def build_local_datetime(time_obj, days_add=0):
-    base = dt_util.now().date() + timedelta(days=days_add)
-    naive = datetime.combine(base, time_obj)
-
-    return dt_util.as_local(
-        dt_util.as_utc(
-            naive.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
-        )
-    )
+def format_12h(moment: datetime) -> str:
+    return moment.strftime("%I:%M %p")
 
 
 # -----------------------------------------------------
 # BASE ENTITY
 # -----------------------------------------------------
-class BasePrayerEntity(CoordinatorEntity):
+class BasePrayerEntity(CoordinatorEntity[PrayerCoordinator]):
 
-    def __init__(self, coordinator):
+    def __init__(self, coordinator: PrayerCoordinator) -> None:
         super().__init__(coordinator)
-
-    @property
-    def device_info(self):
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.entry.entry_id)},
-            name=get_district(self.coordinator.entry),
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
+            name=coordinator.district,
             manufacturer="Zam HS",
             model="Prayer Schedule",
         )
@@ -149,9 +85,8 @@ class PrayerTimeSensor(BasePrayerEntity, SensorEntity):
 
     @property
     def native_value(self):
-        data = self.coordinator.data.get("today", {})
-        dt = apply_district_offset(self.coordinator, data.get(self.prayer))
-        return format_12h(dt) if dt else None
+        moment = self.coordinator.data["today"].get(self.prayer)
+        return format_12h(moment) if moment else None
 
 
 # -----------------------------------------------------
@@ -169,9 +104,7 @@ class PrayerTimestampSensor(BasePrayerEntity, SensorEntity):
 
     @property
     def native_value(self):
-        data = self.coordinator.data.get("today", {})
-        dt = apply_district_offset(self.coordinator, data.get(self.prayer))
-        return build_local_datetime(dt.time()) if dt else None
+        return self.coordinator.data["today"].get(self.prayer)
 
 
 # -----------------------------------------------------
@@ -184,20 +117,18 @@ class TomorrowPrayerSensor(BasePrayerEntity, SensorEntity):
     _attr_icon = "mdi:calendar-clock"
 
     def _build(self):
-        data = self.coordinator.data.get("tomorrow", {})
-        out = {}
-
-        for prayer in PRAYERS:
-            dt = apply_district_offset(self.coordinator, data.get(prayer))
-            if dt:
-                out[prayer.lower()] = format_12h(dt)
-
-        return out
+        data = self.coordinator.data["tomorrow"]
+        return {
+            prayer.lower(): format_12h(data[prayer])
+            for prayer in PRAYERS
+            if prayer in data
+        }
 
     @property
     def native_value(self):
-        res = self._build()
-        return " | ".join(f"{k.capitalize()} {v}" for k, v in res.items())
+        return " | ".join(
+            f"{k.capitalize()} {v}" for k, v in self._build().items()
+        )
 
     @property
     def extra_state_attributes(self):
@@ -212,6 +143,9 @@ class NextPrayerSensor(BasePrayerEntity, SensorEntity):
     _attr_name = "Next Prayer"
     _attr_unique_id = "bn_next_prayer"
     _attr_icon = "mdi:alarm"
+
+    # The countdown changes every second; don't store it in the database.
+    _unrecorded_attributes = frozenset({"countdown"})
 
     def __init__(self, coordinator):
         super().__init__(coordinator)
@@ -232,31 +166,35 @@ class NextPrayerSensor(BasePrayerEntity, SensorEntity):
 
     def _recalculate(self):
         now = dt_util.now()
-        today = self.coordinator.data.get("today", {})
+        data = self.coordinator.data
 
         for prayer in PRAYERS:
             if prayer == "Imsak":
                 continue
 
-            dt = apply_district_offset(self.coordinator, today.get(prayer))
-            if not dt:
-                continue
-
-            prayer_dt = build_local_datetime(dt.time())
-
-            if prayer_dt > now:
+            moment = data["today"].get(prayer)
+            if moment and moment > now:
                 self._next_name = prayer
-                self._next_time = prayer_dt
+                self._next_time = moment
                 return
 
-        tomorrow = self.coordinator.data.get("tomorrow", {})
-        dt = apply_district_offset(self.coordinator, tomorrow.get("Subuh"))
-
-        if dt:
+        moment = data["tomorrow"].get("Subuh")
+        if moment:
             self._next_name = "Subuh"
-            self._next_time = build_local_datetime(dt.time(), days_add=1)
+            self._next_time = moment
+            return
 
-    async def _tick(self, *_):
+        # No schedule left: show nothing instead of a stale prayer.
+        self._next_name = None
+        self._next_time = None
+
+    @callback
+    def _handle_coordinator_update(self):
+        self._recalculate()
+        super()._handle_coordinator_update()
+
+    @callback
+    def _tick(self, _now):
         if not self._next_time or dt_util.now() >= self._next_time:
             self._recalculate()
 
@@ -305,57 +243,43 @@ class HijriDateSensor(BasePrayerEntity, SensorEntity):
             self._unsub = None
 
     def _schedule(self):
-        today = self.coordinator.data.get("today", {})
-        maghrib = today.get("Maghrib")
-
-        if not maghrib:
-            return
-
-        dt = apply_district_offset(self.coordinator, maghrib)
-        maghrib_dt = build_local_datetime(dt.time())
-
-        if dt_util.now() >= maghrib_dt:
-            maghrib_dt += timedelta(days=1)
-
+        """Write the state again at the next real Maghrib time."""
         self._cancel_schedule()
+
+        now = dt_util.now()
+        data = self.coordinator.data
+
+        maghrib = data["today"].get("Maghrib")
+        if maghrib and now >= maghrib:
+            maghrib = data["tomorrow"].get("Maghrib")
+
+        if not maghrib or maghrib <= now:
+            return
 
         self._unsub = async_track_point_in_time(
             self.hass,
             self._trigger,
-            maghrib_dt,
+            maghrib,
         )
 
-    async def _trigger(self, *_):
+    @callback
+    def _trigger(self, _now):
+        self._unsub = None
         self.async_write_ha_state()
         self._schedule()
 
+    @callback
+    def _handle_coordinator_update(self):
+        self._schedule()
+        super()._handle_coordinator_update()
+
     @property
     def native_value(self):
-
         now = dt_util.now()
-        today = self.coordinator.data.get("today", {})
-        maghrib = today.get("Maghrib")
-
         g_date = now.date()
 
-        if maghrib:
-            dt = apply_district_offset(self.coordinator, maghrib)
-            maghrib_dt = build_local_datetime(dt.time())
+        maghrib = self.coordinator.data["today"].get("Maghrib")
+        if maghrib and now >= maghrib:
+            g_date += timedelta(days=1)
 
-            if now >= maghrib_dt:
-                g_date += timedelta(days=1)
-
-        # An offset of 0 is valid, so check for None, not falsiness.
-        offset = self.coordinator.entry.options.get(CONF_HIJRI_OFFSET)
-        if offset is None:
-            offset = self.coordinator.entry.data.get(CONF_HIJRI_OFFSET, 0)
-        offset = int(offset)
-
-        # Shift the Gregorian date first so the month rolls over by itself.
-        h_day, h_month, h_year = gregorian_to_hijri(
-            datetime.combine(
-                g_date + timedelta(days=offset), datetime.min.time()
-            )
-        )
-
-        return f"{h_day} {HIJRI_MONTHS[h_month-1]} {h_year} AH"
+        return format_hijri(g_date, self.coordinator.hijri_offset)
