@@ -1,7 +1,6 @@
 {
   "name": "BN Prayer Times",
-  "content_in_root": false,
   "country": "BN",
   "render_readme": true,
-  "homeassistant": "2024.6.0"
+  "homeassistant": "2024.11.0"
 }
