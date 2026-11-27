@@ -13,7 +13,7 @@ PRAYERS = [
 CONF_HIJRI_OFFSET = "hijri_offset"
 DEFAULT_HIJRI_OFFSET = 0
 
-# ✅ District support
+# District support
 CONF_DISTRICT = "district"
 DEFAULT_DISTRICT = "Brunei/Muara"
 
